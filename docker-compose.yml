@@ -1,0 +1,25 @@
+services:
+  zed:
+    build: .
+    image: zed-web:latest
+    ports:
+      - "6080:6080"   # browser: http://localhost:6080 (only port meant to be published)
+    devices:
+      # Pass through ONLY your Intel GPU's card + render nodes, not the whole
+      # /dev/dri directory (a multi-GPU host would otherwise also expose any
+      # NVIDIA/AMD cards). Find the right pair with:
+      #   lspci -nnk | grep -A2 -i vga         # identify the Intel PCI address
+      #   ls -l /dev/dri/by-path/               # map it to cardN / renderDNNN
+      - /dev/dri/card2:/dev/dri/card2
+      - /dev/dri/renderD129:/dev/dri/renderD129
+    environment:
+      - VNC_PASSWORD=changeme   # required for auth; change this
+      - VNC_USERNAME=zed
+    volumes:
+      - ./workspace:/workspace                # your project files
+      - zed-config:/home/zed/.config/zed       # editor settings
+      - zed-data:/home/zed/.local/share/zed    # extensions, state
+
+volumes:
+  zed-config:
+  zed-data:
