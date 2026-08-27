@@ -103,12 +103,36 @@ driver needs the primary node too.
 If you're on rootless Podman and want NVIDIA, use `sudo podman` for this
 container specifically rather than chasing further permission fixes.
 
+### Software rendering (no GPU device at all)
+
+Works, no Dockerfile changes needed, verified end-to-end including through
+the browser: run the container with **no `--device` flags at all**. `sway`
+detects there's no DRM device, falls back to its software compositor
+automatically, and Zed renders through Mesa's `lavapipe` (a software Vulkan
+implementation that's already bundled in the image, no extra setup). Zed
+will show its own "Unsupported GPU" dialog on first launch — click "Skip",
+or set `ZED_ALLOW_EMULATED_GPU=1` in the container's environment to suppress
+it permanently.
+
+The real tradeoff is exactly what Zed's own dialog says: "awful
+performance" — this is CPU-bound rendering, noticeably slower for anything
+graphically heavy, but genuinely usable for editing text. Since it needs
+no GPU passthrough of any kind, **this is the practical fallback for
+platforms in the next section** (macOS, Windows/WSL2) where real GPU
+passthrough isn't set up or supported — same image, same compose file,
+just drop the `devices:` block.
+
 ## Host platform support
 
-**Linux only, for now.** This image is built and tested against Linux
-container hosts (Intel/AMD verified end-to-end; NVIDIA per the section
-above). macOS and Windows were investigated but aren't supported — notes
-below in case that changes later.
+**Linux only for real GPU acceleration; software rendering (above) works
+anywhere.** This image is built and tested against Linux container hosts
+for the GPU-accelerated path (Intel/AMD verified end-to-end; NVIDIA per the
+section above). macOS and Windows were investigated for GPU passthrough
+specifically and aren't supported there yet — notes below in case that
+changes later. Software rendering doesn't care what host platform this
+runs on; if you're on macOS or Windows and just want it working today,
+skip the `devices:` block and use that instead of chasing platform-specific
+GPU setup.
 
 ### macOS
 
