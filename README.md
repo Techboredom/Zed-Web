@@ -139,9 +139,8 @@ were checked:
 
 ### Windows / WSL2
 
-Not supported yet, but more promising than macOS — real prior art exists
-for this general shape of thing, it just needs actual Dockerfile changes
-that haven't been made:
+Not supported yet. Some of the underlying mechanism has real prior art;
+the specific combination this project needs doesn't:
 
 - WSL2's primary GPU path isn't the standard Linux DRM `/dev/dri` model —
   it exposes `/dev/dxg` (Microsoft's `dxgkrnl` driver), bridging to the
@@ -155,14 +154,24 @@ that haven't been made:
   `dzn` ICD plus `libd3d12`/`libdxcore`, and `/dev/dxg` passed through
   instead of `/dev/dri/*` — a real branch in the Dockerfile, not a flag
   change.
-- Encouraging: people have done this exact shape of thing — there's a
-  published Docker template for GPU-accelerated OpenGL rendering in a WSL2
-  container, and separately people run `sway` itself (the same compositor
-  used here) inside WSL2. So "headless Wayland compositor with GPU accel in
-  a WSL2 container" isn't unproven territory.
-- Rough edge even so: there are recent reports of the `dzn` driver files
-  going missing / Vulkan failing to detect the GPU on current Ubuntu-in-WSL2
-  setups, even for NVIDIA (the best-supported vendor everywhere else).
+- What's actually verified elsewhere: [MatLN8/wsl-gpu-graphics-container](https://github.com/MatLN8/wsl-gpu-graphics-container)
+  demonstrates the `/dev/dxg` + Mesa D3D12 mechanism genuinely working
+  inside a container — real evidence the passthrough mechanism itself
+  works. But it's **OpenGL, not Vulkan** (Zed needs Vulkan), it's a
+  single-commit proof-of-concept with no ongoing maintenance, and its own
+  docs assume an NVIDIA host — Intel/AMD isn't confirmed there either.
+- [jordankoehn/sway-wsl2](https://github.com/jordankoehn/sway-wsl2) runs
+  `sway` under WSL2 and is actively maintained, but don't read too much
+  into it: it doesn't claim or demonstrate GPU-accelerated rendering at
+  all, it's `sway` as a desktop compositor riding WSLg's own graphics
+  pipeline — not evidence for headless, GPU-accelerated `sway` the way this
+  project would need.
+- Net: the `/dev/dxg` passthrough mechanism has proof it can work at all
+  (for OpenGL); nothing found confirms or denies the actual combination
+  this project needs (headless `sway`, Vulkan via `dzn`). Rough edge on
+  top: recent reports of `dzn` driver files going missing / Vulkan failing
+  to detect the GPU on current Ubuntu-in-WSL2 setups, even for NVIDIA (the
+  best-supported vendor everywhere else).
 
 If either of these becomes worth pursuing, the right next step is testing
 against real hardware (a borrowed Mac / a Windows box) rather than writing
