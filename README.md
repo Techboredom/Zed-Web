@@ -5,7 +5,8 @@ compositor (`sway`) rendering through your actual Intel iGPU via `/dev/dri`,
 captured by `wayvnc`, and streamed to any web browser through `websockify` +
 `noVNC`. Verified working end-to-end, including real GPU-accelerated
 rendering (Zed does not show its "Unsupported GPU / software rendering"
-warning with this setup).
+warning with this setup). Linux container hosts only for now — see
+[Host platform support](#host-platform-support) for macOS/Windows notes.
 
 ## Build & run
 
@@ -101,6 +102,71 @@ driver needs the primary node too.
 
 If you're on rootless Podman and want NVIDIA, use `sudo podman` for this
 container specifically rather than chasing further permission fixes.
+
+## Host platform support
+
+**Linux only, for now.** This image is built and tested against Linux
+container hosts (Intel/AMD verified end-to-end; NVIDIA per the section
+above). macOS and Windows were investigated but aren't supported — notes
+below in case that changes later.
+
+### macOS
+
+Not supported, and architecturally a bigger gap than a config tweak would
+fix: Docker/Podman containers on macOS always run inside a Linux VM (no
+shared kernel with the host the way Linux-on-Linux works), so there's no
+`/dev/dri` on the Mac side to pass through in the first place. Three paths
+were checked:
+
+- **Apple's own `container` CLI**: explicitly not supported — confirmed
+  directly by the maintainer. Apple Silicon GPUs lack the IOMMU support the
+  hypervisor needs for secure passthrough; this is a hardware/architecture
+  limitation, not a missing feature that's coming later.
+- **Docker Desktop**: no general GPU device passthrough. It has a narrow
+  "Model Runner" feature for LLM inference specifically, not applicable to a
+  general rendering workload like this one.
+- **Podman with the `krunkit` machine backend** (not the default
+  `applehv`): the one real lead. It exposes a paravirtualized
+  `/dev/dri/renderD128`-style device inside the Linux VM via the Venus
+  protocol (Vulkan-over-virtio-gpu, translated to Metal via MoltenVK on the
+  real Mac GPU). Sources disagree on scope — one described it as
+  compute-only (fine for LLM inference, not for us); better/newer sources
+  say Venus has supported the same extensions DXVK/Zink need for actual
+  draw-call rendering since 2023. Nothing found confirms or denies that a
+  headless Wayland compositor specifically (what `sway` needs here) has
+  been proven to work over it. Untested — would need a non-default Podman
+  config plus likely Dockerfile changes (Venus-specific Mesa Vulkan ICD).
+
+### Windows / WSL2
+
+Not supported yet, but more promising than macOS — real prior art exists
+for this general shape of thing, it just needs actual Dockerfile changes
+that haven't been made:
+
+- WSL2's primary GPU path isn't the standard Linux DRM `/dev/dri` model —
+  it exposes `/dev/dxg` (Microsoft's `dxgkrnl` driver), bridging to the
+  Windows-side GPU driver over D3D12/WDDM. Mesa has a driver built for this
+  specifically (`dzn`, aka "dozen") that translates Vulkan through
+  `/dev/dxg` instead of talking to a real DRM device.
+- This image currently installs Mesa's native hardware ICDs (`anv`/`radv`)
+  and expects `/dev/dri/*` — the wrong driver and device for WSL2.
+  Reportedly installing native Linux GPU drivers inside WSL2 can actively
+  break passthrough rather than just fail to help. WSL2 instead needs the
+  `dzn` ICD plus `libd3d12`/`libdxcore`, and `/dev/dxg` passed through
+  instead of `/dev/dri/*` — a real branch in the Dockerfile, not a flag
+  change.
+- Encouraging: people have done this exact shape of thing — there's a
+  published Docker template for GPU-accelerated OpenGL rendering in a WSL2
+  container, and separately people run `sway` itself (the same compositor
+  used here) inside WSL2. So "headless Wayland compositor with GPU accel in
+  a WSL2 container" isn't unproven territory.
+- Rough edge even so: there are recent reports of the `dzn` driver files
+  going missing / Vulkan failing to detect the GPU on current Ubuntu-in-WSL2
+  setups, even for NVIDIA (the best-supported vendor everywhere else).
+
+If either of these becomes worth pursuing, the right next step is testing
+against real hardware (a borrowed Mac / a Windows box) rather than writing
+more directions from research alone — happy to pick this back up then.
 
 ## Security
 
