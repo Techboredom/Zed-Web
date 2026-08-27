@@ -54,6 +54,54 @@ This image is built for an Intel (or AMD) GPU passed through as specific
   device passed through. That's why this image uses a Wayland compositor
   instead of X11.
 
+### NVIDIA
+
+NVIDIA works differently enough from Intel/AMD that it gets its own section.
+It needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/index.html)
+installed on the host (this is separate from, and in addition to, the normal
+NVIDIA driver).
+
+**Docker, or `sudo podman` (rootful) — should work, standard setup:**
+
+```sh
+# generate the CDI spec once (or use --gpus all if you're on Docker with the
+# legacy nvidia-container-runtime instead of CDI):
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+
+docker run ... --device nvidia.com/gpu=all zed-web    # or: --gpus all
+# / sudo podman run ... --device nvidia.com/gpu=all zed-web
+```
+
+This is the standard, documented way NVIDIA's own toolkit expects to be
+used, and Docker's daemon runs as real root by default — so it isn't
+independently re-verified end-to-end in this repo the way the Intel path
+was, but there's no known reason it wouldn't work.
+
+**Rootless Podman (Podman's default, no `sudo`) — confirmed does not work:**
+
+Rendering hits a hard wall: `sway` fails with
+`gbm_bo_create failed: Permission denied` /
+`DRM_IOCTL_MODE_CREATE_DUMB failed: Permission denied`, even after correctly
+passing through only the NVIDIA device
+(`--device nvidia.com/gpu=all`) and preserving the invoking user's `video`
+group membership (`podman run --group-add keep-groups`, needed because
+rootless Podman otherwise drops supplementary groups on container devices —
+this part *is* necessary and does fix plain device-open access, confirmed
+with `vulkaninfo` and a raw `open()` both succeeding). The remaining failure
+is one level deeper: `sway`'s buffer allocator needs actual DRM-master
+status on the primary node to do KMS buffer allocation, which is a kernel
+capability (effectively `CAP_SYS_ADMIN` against that device), not a
+DAC/group-permission check — and rootless containers structurally can't
+obtain that against real host hardware no matter what user or groups the
+process has. Confirmed this isn't a startup-timing fluke by restarting
+`sway` mid-session with the identical result. Intel/AMD never hits this
+because Mesa's open-source drivers can do headless GPU allocation entirely
+through the render node, which rootless containers *can* access; NVIDIA's
+driver needs the primary node too.
+
+If you're on rootless Podman and want NVIDIA, use `sudo podman` for this
+container specifically rather than chasing further permission fixes.
+
 ## Security
 
 The only port meant to be published is `6080` (browser/noVNC), protected by

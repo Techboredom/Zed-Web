@@ -89,7 +89,7 @@ RUN chown zed:zed /workspace
 COPY sway-config /home/zed/.config/sway/config
 RUN chown -R zed:zed /home/zed/.config
 
-COPY supervisord.conf /etc/supervisor/conf.d/zed.conf
+COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

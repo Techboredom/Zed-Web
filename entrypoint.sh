@@ -20,4 +20,13 @@ else
   echo "         --device /dev/dri/cardN --device /dev/dri/renderDNNN or Zed/sway will fail." >&2
 fi
 
-exec /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf
+# Drop root -> zed for the whole supervisord tree in one step, via setpriv
+# rather than supervisord's own per-program `user=`. That distinction
+# matters for NVIDIA: `podman run --group-add keep-groups` preserves this
+# process's real (host) supplementary groups, including "video" (needed to
+# open /dev/dri/card1) -- but a *second* privilege drop done by supervisord
+# internally resets supplementary groups based on the container's own
+# /etc/group, silently losing that access again. --keep-groups here means
+# "don't touch groups at all", so whatever was already in effect survives.
+exec setpriv --reuid=zed --regid=zed --keep-groups \
+    /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf

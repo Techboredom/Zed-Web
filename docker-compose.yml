@@ -12,6 +12,12 @@ services:
       #   ls -l /dev/dri/by-path/               # map it to cardN / renderDNNN
       - /dev/dri/card2:/dev/dri/card2
       - /dev/dri/renderD129:/dev/dri/renderD129
+      # NVIDIA instead? Swap the two lines above for:
+      #   - nvidia.com/gpu=all
+      # ...and see the README's NVIDIA section first: it needs the NVIDIA
+      # Container Toolkit on the host, and on rootless Podman (this tool's
+      # default, no sudo) it's confirmed NOT to work regardless of device
+      # passthrough - use `sudo podman compose` / rootful Docker instead.
     environment:
       - VNC_PASSWORD=changeme   # required for auth; change this
       - VNC_USERNAME=zed
