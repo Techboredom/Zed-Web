@@ -139,7 +139,7 @@ were checked:
 
 ### Windows / WSL2
 
-Not supported yet. Some of the underlying mechanism has real prior art;
+Not supported yet. Some of the underlying mechanism has real potential;
 the specific combination this project needs doesn't:
 
 - WSL2's primary GPU path isn't the standard Linux DRM `/dev/dri` model —
