@@ -1,0 +1,18 @@
+name: build-container
+
+on:
+  push:
+
+jobs:
+  build:
+    # Adjust this label to match how your Forgejo runner is registered
+    # (see the "labels" list in that runner's config.yaml).
+    runs-on: docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        # If the runner can't reach github.com, use Forgejo's own mirror instead:
+        # uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t zed-web:${{ github.sha }} .
