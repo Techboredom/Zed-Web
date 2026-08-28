@@ -78,8 +78,12 @@ RUN ln -s /home/zed/.local/bin/zed /usr/local/bin/zed \
 ENV NPM_CONFIG_PREFIX=/home/zed/.npm-global \
     PATH="/home/zed/.local/bin:/home/zed/.cargo/bin:/usr/local/go/bin:/home/zed/.npm-global/bin:${PATH}"
 
-# Serve the noVNC client at the web root
-RUN ln -s /usr/share/novnc/vnc.html /usr/share/novnc/index.html
+# Serve the noVNC client at the web root, auto-connecting straight into a
+# session that resizes the real desktop resolution to match the browser
+# window (stock noVNC otherwise lands on a manual connect screen with a
+# fixed-size, non-resizing canvas). See novnc-index.html for the CSS-scaling
+# fallback mode.
+COPY novnc-index.html /usr/share/novnc/index.html
 
 WORKDIR /workspace
 RUN chown zed:zed /workspace

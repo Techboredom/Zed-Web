@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zed</title>
+<!--
+  Stock noVNC's index.html is just a symlink to vnc.html, which lands on a
+  manual "Connect" screen and a canvas that doesn't resize with the browser
+  window. Redirect into vnc.html with query params instead:
+    - autoconnect: skip the connect screen (auth is already handled one
+      layer up, by websockify's BasicHTTPAuth -- see entrypoint.sh)
+    - resize=remote: ask wayvnc/sway to change the *real* desktop
+      resolution to match the browser window, via sway's
+      wlr-output-management support (confirmed working here -- swaymsg
+      shows the HEADLESS-1 output's current_mode actually change on
+      connect). This is what gets a true full-bleed fill with no
+      letterboxing, since the desktop's aspect ratio becomes whatever the
+      window's is, rather than staying fixed at sway-config's 1920x1080.
+      `resize=scale` is the fallback if you ever move this to a VNC server
+      that doesn't support remote resizing: it CSS-scales instead, which
+      still fills the window but preserves the fixed aspect ratio, so it
+      letterboxes whenever the window isn't 16:9.
+    - reconnect: retry the websocket automatically if it drops, instead of
+      dumping back to a dead screen.
+-->
+<meta http-equiv="refresh" content="0; url=vnc.html?autoconnect=true&resize=remote&reconnect=true&reconnect_delay=2000">
+</head>
+<body>
+<p>Redirecting to <a href="vnc.html?autoconnect=true&resize=remote&reconnect=true&reconnect_delay=2000">the noVNC client</a>&hellip;</p>
+</body>
+</html>

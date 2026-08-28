@@ -15,7 +15,14 @@ docker compose up --build
 ```
 
 Then open `http://localhost:6080` and log in with the browser's basic-auth
-prompt using `VNC_USERNAME` / `VNC_PASSWORD` from `docker-compose.yml`.
+prompt using `VNC_USERNAME` / `VNC_PASSWORD` from `docker-compose.yml`. It
+auto-connects and resizes the real desktop resolution to match your browser
+window (`resize=remote`), so it fills the window edge-to-edge with no
+letterboxing, live as you resize it. For the plain connect screen (e.g. to
+try `resize=scale`, a CSS-scaling fallback that letterboxes on non-16:9
+windows but doesn't depend on server-side resize support — see
+`novnc-index.html` for details), open `vnc.html` directly with no query
+string.
 
 Without compose:
 
