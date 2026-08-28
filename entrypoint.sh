@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p "$XDG_RUNTIME_DIR" /workspace
+mkdir -p "$XDG_RUNTIME_DIR" /workspace /home/zed/.config/zed /home/zed/.local/share/zed
 chown zed:zed "$XDG_RUNTIME_DIR" /workspace
 chmod 700 "$XDG_RUNTIME_DIR"
+
+# The zed-config/zed-data named volumes mount over .config/zed and
+# .local/share/zed. Docker creates a new named volume's initial contents
+# root:root when there's nothing in the image at that exact path to copy
+# ownership from (there isn't, until Zed itself runs once), which shadows
+# the build-time `chown -R zed:zed /home/zed/.config` and leaves Zed unable
+# to write there.
+chown -R zed:zed /home/zed/.config/zed /home/zed/.local/share/zed
 
 if [ -n "${VNC_PASSWORD:-}" ]; then
   export NOVNC_AUTH_ARGS="--web-auth --auth-plugin=websockify.auth_plugins.BasicHTTPAuth --auth-source=${VNC_USERNAME:-zed}:${VNC_PASSWORD}"
@@ -19,6 +27,13 @@ else
   echo "WARNING: /dev/dri not found in container. Pass through the Intel GPU node with" >&2
   echo "         --device /dev/dri/cardN --device /dev/dri/renderDNNN or Zed/sway will fail." >&2
 fi
+
+# supervisord (once dropped to zed below) reopens /dev/stdout and /dev/stderr
+# itself for each child program's stdout_logfile/stderr_logfile, rather than
+# just inheriting the fds. Those point at Docker's own log pipe, created
+# root:root mode 0600, so that reopen fails with EACCES once we're no longer
+# root -- taking down sway/wayvnc/novnc. Widen it while we're still root.
+chmod 666 /proc/self/fd/1 /proc/self/fd/2
 
 # Drop root -> zed for the whole supervisord tree in one step, via setpriv
 # rather than supervisord's own per-program `user=`. That distinction

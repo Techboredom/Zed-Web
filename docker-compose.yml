@@ -10,7 +10,7 @@ services:
       # NVIDIA/AMD cards). Find the right pair with:
       #   lspci -nnk | grep -A2 -i vga         # identify the Intel PCI address
       #   ls -l /dev/dri/by-path/               # map it to cardN / renderDNNN
-      - /dev/dri/card2:/dev/dri/card2
+      - /dev/dri/card1:/dev/dri/card1
       - /dev/dri/renderD129:/dev/dri/renderD129
       # NVIDIA instead? Swap the two lines above for:
       #   - nvidia.com/gpu=all
