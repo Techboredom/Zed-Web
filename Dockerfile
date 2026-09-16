@@ -95,8 +95,26 @@ ENV NPM_CONFIG_PREFIX=/home/zed/.npm-global \
 # fallback mode.
 COPY novnc-index.html /usr/share/novnc/index.html
 
+# Soften the streamed view with rounded corners + a shadow around the
+# canvas - see zed-corners.css. This is a browser-side effect on noVNC's
+# vnc.html (a vendor file we don't otherwise touch), so it's linked in with
+# a one-line sed rather than owning a whole duplicate copy of that file.
+COPY zed-corners.css /usr/share/novnc/zed-corners.css
+RUN sed -i 's#</head>#<link rel="stylesheet" href="zed-corners.css">\n</head>#' \
+    /usr/share/novnc/vnc.html
+
 WORKDIR /workspace
 RUN chown zed:zed /workspace
+
+# Default Zed to a dark theme - there's no real "system" light/dark signal
+# in a headless container for Zed's "system" mode to follow, so it'd
+# otherwise land on whatever Zed's own hardcoded fallback is. Lands in the
+# zed-config named volume's initial content on first creation (see
+# entrypoint.sh for the matching runtime chown, needed because Docker
+# creates that volume root-owned otherwise); edit settings.json normally
+# after that to change it, this only sets the starting point.
+COPY zed-settings.json /home/zed/.config/zed/settings.json
+RUN chown -R zed:zed /home/zed/.config/zed
 
 # sway launches Zed itself once the compositor is up (see sway-config); this
 # keeps them on the same Wayland socket without extra process choreography.

@@ -1,0 +1,22 @@
+/*
+ * Softens the noVNC view: rounds the corners of the streamed desktop and
+ * gives it a little breathing room + shadow, rather than butting flush
+ * against the browser edges. Purely a browser-side visual effect on the
+ * <canvas> noVNC creates at runtime (it has no id/class of its own, hence
+ * the descendant selector) - it doesn't change anything about the actual
+ * compositor or the window it's streaming. See the Dockerfile for how this
+ * gets linked into vnc.html.
+ */
+html, body {
+    background: #1e1e1e;
+}
+
+#noVNC_container {
+    box-sizing: border-box;
+    padding: 12px;
+}
+
+#noVNC_container canvas {
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}

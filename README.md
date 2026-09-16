@@ -22,7 +22,12 @@ letterboxing, live as you resize it. For the plain connect screen (e.g. to
 try `resize=scale`, a CSS-scaling fallback that letterboxes on non-16:9
 windows but doesn't depend on server-side resize support — see
 `novnc-index.html` for details), open `vnc.html` directly with no query
-string.
+string. The view itself has rounded corners and a drop shadow
+(`zed-corners.css`) instead of butting flush against the browser edges —
+purely a browser-side CSS effect on noVNC's canvas, not a real compositor
+window shape (a real one would mean building `swayfx`, a `sway` fork, from
+source — passed on that given the build fragility for a cosmetic change;
+see git history if that tradeoff ever looks worth revisiting).
 
 Without compose:
 
@@ -263,7 +268,13 @@ equivalent launch arg (e.g. Puppeteer's `args: ['--no-sandbox']`).
 
 - `./workspace` — your project files, bind-mounted.
 - `zed-config` / `zed-data` named volumes — Zed's settings and extensions
-  survive container rebuilds.
+  survive container rebuilds. `zed-settings.json` (defaults to `"theme":
+  "One Dark"` — there's no real "system" light/dark signal in a headless
+  container for Zed's own system-follow mode to key off, so this just picks
+  a fixed one) seeds `zed-config`'s `settings.json` the first time that
+  volume is created; edit it normally through Zed after that, same as any
+  other setting — this only sets the starting point, not a permanent
+  override.
 
 ## First run in the browser
 
