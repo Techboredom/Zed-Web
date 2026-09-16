@@ -53,6 +53,15 @@ RUN NODE_VERSION="$(curl -fsSL https://nodejs.org/dist/index.json | python3 -c '
     && tar -C /usr/local --strip-components=1 -xJf /tmp/node.tar.xz \
     && rm /tmp/node.tar.xz
 
+# asdf (CLI version manager, asdf-vm.com): fetch latest release. Not an apt
+# package on Ubuntu - "asdftool" there is an unrelated scientific-data-format
+# tool (from python-asdf), not this. Modern asdf (0.16+) ships as a single
+# Go binary, no more git-clone-and-source-a-shell-script install.
+RUN ASDF_VERSION="$(curl -fsSL https://api.github.com/repos/asdf-vm/asdf/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')" \
+    && curl -fsSL "https://github.com/asdf-vm/asdf/releases/download/${ASDF_VERSION}/asdf-${ASDF_VERSION}-linux-amd64.tar.gz" -o /tmp/asdf.tar.gz \
+    && tar -C /usr/local/bin -xzf /tmp/asdf.tar.gz \
+    && rm /tmp/asdf.tar.gz
+
 # Zed refuses to run as root, so everything below runs as this user.
 # Ubuntu's base image ships a default "ubuntu" user at uid 1000; drop it so
 # we can reuse 1000, which lines up with the default host user's uid for
@@ -74,9 +83,10 @@ RUN ln -s /home/zed/.local/bin/zed /usr/local/bin/zed \
     && chown -R zed:zed /home/zed
 
 # So `npm install -g ...` as the zed user writes to its own home instead of
-# needing root access to /usr/local.
+# needing root access to /usr/local. The .asdf/shims entry is where asdf
+# exposes whatever tool versions get installed via `asdf install ...`.
 ENV NPM_CONFIG_PREFIX=/home/zed/.npm-global \
-    PATH="/home/zed/.local/bin:/home/zed/.cargo/bin:/usr/local/go/bin:/home/zed/.npm-global/bin:${PATH}"
+    PATH="/home/zed/.local/bin:/home/zed/.cargo/bin:/usr/local/go/bin:/home/zed/.npm-global/bin:/home/zed/.asdf/shims:${PATH}"
 
 # Serve the noVNC client at the web root, auto-connecting straight into a
 # session that resizes the real desktop resolution to match the browser

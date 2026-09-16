@@ -228,8 +228,15 @@ plus `pkg-config`/`libssl-dev` for crates like `openssl-sys`), `go` (latest
 stable, fetched at build time), `rustc`/`cargo` (via `rustup`, stable
 channel), `node`/`npm` (latest, fetched at build time — not Ubuntu's stale
 apt package, and not the older Node that `novnc` happens to pull in as a
-transitive dependency), `uv`/`uvx`, and `google-chrome` for headless browser
-work.
+transitive dependency), `uv`/`uvx`, [`asdf`](https://asdf-vm.com/) (latest,
+fetched at build time — not an apt package on Ubuntu; watch out, there's an
+unrelated `asdftool` in Ubuntu's repos for scientific data files, not this),
+and `google-chrome` for headless browser work.
+
+No `asdf` plugins/language versions are preinstalled — `asdf plugin add
+<name> && asdf install <name> latest && asdf set -u <name> latest` per
+project as needed; verified end-to-end (plugin add, install, and shim
+resolution on `PATH` all work) with the `jq` plugin.
 
 `npm install -g <pkg>` works without sudo/permission errors as the `zed`
 user — its global prefix is set to `~/.npm-global`, which that user owns.
