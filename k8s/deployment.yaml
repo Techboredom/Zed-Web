@@ -1,10 +1,12 @@
 # kubectl apply -f k8s/secret.yaml (see secret.example.yaml) -f k8s/deployment.yaml
 #
-# Before applying: push the image somewhere this cluster can pull it from
-# and update `image:` below - a locally `podman build`/`docker build`-ed
-# image isn't visible to a cluster's own container runtime.
-#   docker build -t your-registry/zed-web:latest .
-#   docker push your-registry/zed-web:latest
+# `image:` below points at ctr.int.techboredom.com:8443/coding_tools/zed,
+# built and pushed by .forgejo/workflows/build.yml on every push to main
+# (needs REGISTRY_USERNAME/REGISTRY_PASSWORD set as Actions secrets on that
+# repo - see the workflow file). A local `podman`/`docker build` alone isn't
+# visible to a cluster's own container runtime; either push through that CI
+# job or `docker build -t ctr.int.techboredom.com:8443/coding_tools/zed .`
+# and `docker push` it yourself.
 
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -90,7 +92,7 @@ spec:
       #     Docker/podman in that section.
       containers:
         - name: zed-web
-          image: your-registry/zed-web:latest
+          image: ctr.int.techboredom.com:8443/coding_tools/zed:latest
           ports:
             - containerPort: 6080
           env:

@@ -289,11 +289,14 @@ equivalent launch arg (e.g. Puppeteer's `args: ['--no-sandbox']`).
 ## Kubernetes
 
 `k8s/deployment.yaml` has PVCs + a Deployment + a Service in place of
-`docker-compose.yml`'s volumes/container/ports. Copy
-`k8s/secret.example.yaml` to `k8s/secret.yaml` (gitignored) and fill in a
-real password, push the image somewhere the cluster can pull it from and
-update `image:` in the manifest (a local `podman`/`docker build` isn't
-visible to a cluster's own runtime), then:
+`docker-compose.yml`'s volumes/container/ports, pointing at
+`ctr.int.techboredom.com:8443/coding_tools/zed:latest`. That image is built
+and pushed by `.forgejo/workflows/build.yml` on every push to `main` (every
+other branch just builds, to prove the Dockerfile still works, without
+touching the registry) — needs `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` set
+under this repo's Settings → Actions → Secrets first; nothing's committed
+anywhere. Copy `k8s/secret.example.yaml` to `k8s/secret.yaml` (gitignored)
+and fill in a real VNC password, then:
 
 ```sh
 kubectl apply -f k8s/secret.yaml -f k8s/deployment.yaml

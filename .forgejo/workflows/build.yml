@@ -3,6 +3,9 @@ name: build-container
 on:
   push:
 
+env:
+  IMAGE: ctr.int.techboredom.com:8443/coding_tools/zed
+
 jobs:
   build:
     # Adjust this label to match how your Forgejo runner is registered
@@ -14,5 +17,20 @@ jobs:
         # If the runner can't reach github.com, use Forgejo's own mirror instead:
         # uses: https://code.forgejo.org/actions/checkout@v4
 
+      # Every push: just prove the Dockerfile still builds - fast feedback,
+      # no registry write, works from any branch.
       - name: Build image
-        run: docker build -t zed-web:${{ github.sha }} .
+        run: docker build -t "$IMAGE:${{ github.sha }}" .
+
+      # Only main: also tag :latest and push both tags, so k8s/deployment.yaml
+      # (which points at $IMAGE:latest) always has something deployable.
+      # Needs REGISTRY_USERNAME/REGISTRY_PASSWORD set under this repo's (or
+      # org's) Settings -> Actions -> Secrets - not committed anywhere.
+      - name: Push to registry
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:latest"
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ctr.int.techboredom.com:8443 \
+            -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
