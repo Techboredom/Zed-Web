@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         # core
-        ca-certificates curl wget gnupg xz-utils tini git \
+        ca-certificates curl wget gnupg xz-utils tini git rsync \
         # headless Wayland compositor (real GPU rendering) + VNC server + browser bridge
         sway wayvnc xwayland novnc websockify supervisor \
         # Mesa userspace: the real Intel/AMD hardware Vulkan (anv/radv) and
@@ -131,6 +131,26 @@ RUN chown -R zed:zed /home/zed/.config/zed
 # keeps them on the same Wayland socket without extra process choreography.
 COPY sway-config /home/zed/.config/sway/config
 RUN chown -R zed:zed /home/zed/.config
+
+# Golden backup of the now-fully-populated $HOME, at a path no volume ever
+# gets mounted over. Docker named volumes (docker-compose.yml's zed-config/
+# zed-data) auto-populate from whatever the image already has at that exact
+# path the first time they're created, so they never need this. Kubernetes
+# PVCs don't: they mount in empty and completely shadow it instead. Mount
+# a PVC over the whole of /home/zed (e.g. one big volume instead of the two
+# narrow compose ones) and, without this, Zed itself, rustup, uv, and the
+# npm-global installs (Claude Code, Pi) all silently vanish - worse, so does
+# ~/.config/sway/config, the one line that launches Zed at all, so the
+# container comes up "healthy" (everything RUNNING) showing a blank screen
+# forever. entrypoint.sh restores from here on first boot only (a marker
+# file, itself part of this backup, makes that a no-op once already done -
+# including for the compose deployment, where it's baked in from the start
+# and this path is simply never exercised). Excludes .npm (npm's own
+# download cache, not installed state - safe to lose, regenerates itself).
+RUN touch /home/zed/.provisioned \
+    && chown zed:zed /home/zed/.provisioned \
+    && mkdir -p /opt/zed-home-seed \
+    && rsync -a --exclude=.npm /home/zed/ /opt/zed-home-seed/
 
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh

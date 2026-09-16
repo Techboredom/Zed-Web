@@ -1,2 +1,3 @@
 .claude/
 workspace/
+k8s/secret.yaml

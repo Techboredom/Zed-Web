@@ -1,0 +1,149 @@
+# kubectl apply -f k8s/secret.yaml (see secret.example.yaml) -f k8s/deployment.yaml
+#
+# Before applying: push the image somewhere this cluster can pull it from
+# and update `image:` below - a locally `podman build`/`docker build`-ed
+# image isn't visible to a cluster's own container runtime.
+#   docker build -t your-registry/zed-web:latest .
+#   docker push your-registry/zed-web:latest
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zed-home
+spec:
+  accessModes: ["ReadWriteOnce"]
+  # 100Gi as requested. One volume for the whole of /home/zed rather than
+  # compose's two narrower ones (zed-config, zed-data) - now that
+  # entrypoint.sh knows how to reseed a fresh/empty $HOME from the image's
+  # own baked-in defaults (see the README's Kubernetes section, and the
+  # comment above that reseed logic in entrypoint.sh, for why a PVC there
+  # needs that at all when the compose deployment never did).
+  resources:
+    requests:
+      storage: 100Gi
+  # storageClassName: standard   # uncomment/adjust for your cluster if the
+                                  # default storage class isn't what you want
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zed-workspace
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi   # your project files; size to taste
+  # storageClassName: standard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zed-web
+spec:
+  replicas: 1   # this is a single-user, stateful, single-instance editor -
+                # don't scale it past 1; ReadWriteOnce PVCs wouldn't allow
+                # a second replica to schedule anyway
+  strategy:
+    type: Recreate   # not RollingUpdate: two pods can't both hold the
+                      # ReadWriteOnce PVCs at once
+  selector:
+    matchLabels:
+      app: zed-web
+  template:
+    metadata:
+      labels:
+        app: zed-web
+    spec:
+      # --- GPU passthrough (optional) ---
+      # Default here is no GPU at all - falls back to software rendering
+      # automatically (verified working; see the README's "Software
+      # rendering" section), which needs no device access and runs on any
+      # node. Real GPU acceleration in Kubernetes doesn't have a Docker
+      # `--device`-equivalent for a generic Intel/AMD render node; pick one:
+      #
+      # (a) Intel/AMD via hostPath, pinned to a specific node (the vanilla-
+      #     k8s equivalent of what docker-compose.yml does - no cluster-
+      #     level GPU support required, but you must pin the node yourself
+      #     since the scheduler has no way to know which ones have a GPU):
+      #       nodeSelector:
+      #         kubernetes.io/hostname: <node with the Intel/AMD GPU>
+      #     ...and add to the container below:
+      #       volumeMounts:
+      #         - {name: dri, mountPath: /dev/dri}
+      #       securityContext:
+      #         privileged: true   # or the specific device-cgroup rule for
+      #                            # your runtime instead of full privileged
+      #     ...and to spec.volumes:
+      #       - name: dri
+      #         hostPath: {path: /dev/dri}
+      #
+      # (b) NVIDIA via the standard k8s device plugin/GPU Operator, if your
+      #     cluster has it installed - add to the container's resources:
+      #       limits:
+      #         nvidia.com/gpu: 1
+      #     This runs through the node's container runtime as a privileged
+      #     integration (not "rootless" the way plain `podman run` is), so
+      #     the rootless-Podman DRM-master blocker documented in the
+      #     README's NVIDIA section shouldn't apply - but this specific
+      #     path (k8s + device plugin) hasn't been independently verified
+      #     here the way the Intel path was, same caveat as rootful
+      #     Docker/podman in that section.
+      containers:
+        - name: zed-web
+          image: your-registry/zed-web:latest
+          ports:
+            - containerPort: 6080
+          env:
+            - name: VNC_USERNAME
+              valueFrom:
+                secretKeyRef: {name: zed-web-auth, key: VNC_USERNAME}
+            - name: VNC_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: zed-web-auth, key: VNC_PASSWORD}
+            # - name: UPDATE_ON_START     # opt-in; re-checks zed/rustup/uv/
+            #   value: "true"             # npm-global tools on every pod
+                                           # start. Off by default - needs
+                                           # network and adds real time to
+                                           # every restart. See entrypoint.sh.
+          volumeMounts:
+            - {name: home, mountPath: /home/zed}
+            - {name: workspace, mountPath: /workspace}
+          # A starting point, not a measured requirement - adjust to taste.
+          # Zed + sway + Chrome + whatever language servers/build tooling
+          # get used can burst well above the request.
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          # tcpSocket, not httpGet: the root path requires HTTP Basic Auth
+          # and returns 401 without it, which httpGet's default 200-399
+          # success range would treat as a failed probe.
+          readinessProbe:
+            tcpSocket: {port: 6080}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: 6080}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - {name: home, persistentVolumeClaim: {claimName: zed-home}}
+        - {name: workspace, persistentVolumeClaim: {claimName: zed-workspace}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zed-web
+spec:
+  selector:
+    app: zed-web
+  ports:
+    - port: 6080
+      targetPort: 6080
+  # ClusterIP by default - reach it with `kubectl port-forward
+  # svc/zed-web 6080:6080`, or change this to a LoadBalancer/NodePort, or
+  # put an Ingress in front, depending on how the rest of your cluster
+  # exposes things. Left unopinionated since that varies a lot per cluster.

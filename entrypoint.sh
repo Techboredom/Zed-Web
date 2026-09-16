@@ -13,6 +13,40 @@ chmod 700 "$XDG_RUNTIME_DIR"
 # to write there.
 chown -R zed:zed /home/zed/.config/zed /home/zed/.local/share/zed
 
+# k8s (or anything mounting a volume over the *whole* of $HOME, rather than
+# compose's narrower .config/zed + .local/share/zed above): a fresh/empty
+# volume there shadows everything the image baked in - Zed itself, rustup,
+# uv, npm-global tools, and critically ~/.config/sway/config (the one line
+# that launches Zed at all). Restore from the golden backup built at image
+# build time. .provisioned (itself part of that backup) makes this a no-op
+# once already done - including for the compose deployment, which never
+# empties $HOME in the first place and so already has it from the image
+# directly, never touching this branch at all.
+if [ ! -e "$HOME/.provisioned" ]; then
+  echo "First boot on this \$HOME - restoring zed/rustup/uv/npm-global tools and config from the image..."
+  rsync -a /opt/zed-home-seed/ "$HOME/"
+fi
+
+# Opt-in: re-fetch latest zed/rustup/uv/npm-global tools on every start.
+# Off by default because it needs network access and adds real time (a
+# fresh Zed download alone is ~150MB) to every single pod restart, not just
+# the first. Only covers what actually lives under $HOME and so is at risk
+# from the volume-shadowing issue above - go/node/asdf's own binary/Chrome/
+# sway etc. are all system packages baked into the image itself; refresh
+# those by rebuilding the image, not from here. Failures here are
+# non-fatal: better to start with whatever's already installed than not
+# start at all over a transient network blip.
+if [ "${UPDATE_ON_START:-false}" = "true" ]; then
+  echo "UPDATE_ON_START=true - updating zed/rustup/uv/npm-global tools..."
+  setpriv --reuid=zed --regid=zed --keep-groups bash -c '
+    set -x
+    curl -f https://zed.dev/install.sh | sh
+    rustup update
+    uv self update
+    npm install -g @anthropic-ai/claude-code@latest @earendil-works/pi-coding-agent@latest
+  ' || echo "WARNING: UPDATE_ON_START did not complete cleanly; continuing with what was already installed." >&2
+fi
+
 if [ -n "${VNC_PASSWORD:-}" ]; then
   export NOVNC_AUTH_ARGS="--web-auth --auth-plugin=websockify.auth_plugins.BasicHTTPAuth --auth-source=${VNC_USERNAME:-zed}:${VNC_PASSWORD}"
 else

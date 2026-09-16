@@ -286,6 +286,65 @@ equivalent launch arg (e.g. Puppeteer's `args: ['--no-sandbox']`).
   other setting — this only sets the starting point, not a permanent
   override.
 
+## Kubernetes
+
+`k8s/deployment.yaml` has PVCs + a Deployment + a Service in place of
+`docker-compose.yml`'s volumes/container/ports. Copy
+`k8s/secret.example.yaml` to `k8s/secret.yaml` (gitignored) and fill in a
+real password, push the image somewhere the cluster can pull it from and
+update `image:` in the manifest (a local `podman`/`docker build` isn't
+visible to a cluster's own runtime), then:
+
+```sh
+kubectl apply -f k8s/secret.yaml -f k8s/deployment.yaml
+kubectl port-forward svc/zed-web 6080:6080   # or your own Ingress/LoadBalancer
+```
+
+**The one big PVC deserves an explanation, since it's not just "bigger
+volumes":** the manifest uses a single 100Gi `zed-home` PVC for the whole
+of `/home/zed`, replacing compose's two narrower volumes
+(`zed-config`/`zed-data`) — and that distinction actually matters, not just
+stylistically. Docker's local named volumes auto-populate from whatever the
+image already has at that exact path the first time they're created, which
+is why the narrow compose volumes never caused problems. **Kubernetes PVCs
+don't do that at all** — they mount in empty and completely shadow
+whatever's baked into the image. Mount an empty PVC over the whole of
+`/home/zed` without accounting for that, and Zed itself
+(`~/.local/zed.app`), `rustup`, `uv`, and the npm-global installs (Claude
+Code, Pi) all silently vanish. Worse: so does `~/.config/sway/config` — the
+one line that launches Zed at all — so the container comes up looking
+completely healthy (every `supervisord` program `RUNNING`) while showing a
+blank screen forever, with nothing pointing at why.
+
+`entrypoint.sh` handles this: the image bakes a golden copy of the fully
+set-up `/home/zed` to `/opt/zed-home-seed` (a path no volume ever touches),
+and restores from it on first boot only, detected via a `.provisioned`
+marker file that's itself part of that backup. This is a no-op for the
+compose deployment — that marker's already present there from the image
+directly, since compose never empties `/home/zed` in the first place.
+Verified end-to-end here: a fresh/empty volume mounted straight over
+`/home/zed` correctly triggers the restore, Zed launches successfully
+afterward, and a second boot on that same (now-populated) volume correctly
+skips it.
+
+Set `UPDATE_ON_START=true` (commented out in the manifest by default) to
+also re-fetch latest `zed`/`rustup`/`uv`/the npm-global tools on every pod
+start, not just restore what was baked in — verified working end-to-end too
+(re-downloads Zed, runs `rustup update`, `uv self update`, and
+`npm install -g ...@latest` for Claude Code/Pi). Off by default on purpose:
+it needs network access and adds real time to *every* restart, not just the
+first. It only covers what actually lives under `/home/zed` — Go, Node,
+`asdf`'s own binary, Chrome, `sway` etc. are all system packages baked into
+the image itself; refresh those by rebuilding the image, not from here.
+
+GPU passthrough in Kubernetes doesn't have a direct equivalent of Docker's
+`--device` flag for a generic Intel/AMD render node — see the commented
+options in `deployment.yaml` (`hostPath` + pinning the pod to a specific
+node, or the standard NVIDIA device-plugin resource request if your cluster
+has that installed). The manifest defaults to no GPU at all and falls back
+to software rendering instead, since that needs no device access, works on
+any node, and is already verified working (see the GPU section above).
+
 ## First run in the browser
 
 - Zed opens `/workspace` in **Restricted Mode** (it doesn't recognize the
