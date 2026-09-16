@@ -236,7 +236,17 @@ apt package, and not the older Node that `novnc` happens to pull in as a
 transitive dependency), `uv`/`uvx`, [`asdf`](https://asdf-vm.com/) (latest,
 fetched at build time — not an apt package on Ubuntu; watch out, there's an
 unrelated `asdftool` in Ubuntu's repos for scientific data files, not this),
-and `google-chrome` for headless browser work.
+`google-chrome` for headless browser work, and two terminal coding
+agents — [`claude`](https://www.npmjs.com/package/@anthropic-ai/claude-code)
+(Claude Code) and [`pi`](https://github.com/earendil-works/pi)
+(`@earendil-works/pi-coding-agent` — not `@mariozechner/pi-coding-agent`,
+which is the same tool under its old, now-deprecated npm scope; checked
+directly against the registry since search results mostly still point at
+the old one). Neither ships with credentials — set `ANTHROPIC_API_KEY` (or
+run their own `/login`) at runtime. These aren't part of the Zed GUI
+workflow; they're here because this image doubles as a plain dev shell —
+`docker exec -it <container> bash` and use them directly, independent of
+whatever's happening in the browser.
 
 No `asdf` plugins/language versions are preinstalled — `asdf plugin add
 <name> && asdf install <name> latest && asdf set -u <name> latest` per

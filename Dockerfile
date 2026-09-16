@@ -88,6 +88,17 @@ RUN ln -s /home/zed/.local/bin/zed /usr/local/bin/zed \
 ENV NPM_CONFIG_PREFIX=/home/zed/.npm-global \
     PATH="/home/zed/.local/bin:/home/zed/.cargo/bin:/usr/local/go/bin:/home/zed/.npm-global/bin:/home/zed/.asdf/shims:${PATH}"
 
+# Claude Code and the Pi coding agent: not part of the Zed GUI workflow, but
+# this image doubles as a general dev shell for headless/terminal use (e.g.
+# `docker exec`). @mariozechner/pi-coding-agent is deprecated upstream in
+# favor of @earendil-works/pi-coding-agent (same tool, moved npm scope) -
+# checked both on the npm registry directly since the deprecated one is
+# still what most search results point to. Neither ships an API key; both
+# need ANTHROPIC_API_KEY (or their own /login) set at runtime, not baked in.
+USER zed
+RUN npm install -g @anthropic-ai/claude-code @earendil-works/pi-coding-agent
+USER root
+
 # Serve the noVNC client at the web root, auto-connecting straight into a
 # session that resizes the real desktop resolution to match the browser
 # window (stock noVNC otherwise lands on a manual connect screen with a
