@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p "$XDG_RUNTIME_DIR" /workspace /home/zed/.config/zed /home/zed/.local/share/zed
-chown zed:zed "$XDG_RUNTIME_DIR" /workspace
+# Where Zed opens on launch - see sway-config. Defaulting to /workspace
+# keeps this exactly matching prior behavior when unset (Docker Compose's
+# own bind mount); a deployment that already has a single /home/zed volume
+# (e.g. Kubernetes) can point this inside it instead and skip a second
+# volume/mount entirely.
+WORKSPACE_DIR="${ZED_WORKSPACE_DIR:-/workspace}"
+
+mkdir -p "$XDG_RUNTIME_DIR" "$WORKSPACE_DIR" /home/zed/.config/zed /home/zed/.local/share/zed
+chown zed:zed "$XDG_RUNTIME_DIR" "$WORKSPACE_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
 # The zed-config/zed-data named volumes mount over .config/zed and
@@ -26,6 +33,11 @@ if [ ! -e "$HOME/.provisioned" ]; then
   echo "First boot on this \$HOME - restoring zed/rustup/uv/npm-global tools and config from the image..."
   rsync -a /opt/zed-home-seed/ "$HOME/"
 fi
+# Re-assert after a possible reseed above, in case ZED_WORKSPACE_DIR points
+# somewhere under $HOME that the golden backup wouldn't itself contain
+# (it's a backup of $HOME, taken before any workspace files existed there).
+mkdir -p "$WORKSPACE_DIR"
+chown zed:zed "$WORKSPACE_DIR"
 
 # Opt-in: re-fetch latest zed/rustup/uv/npm-global tools on every start.
 # Off by default because it needs network access and adds real time (a

@@ -1,3 +1,9 @@
 output HEADLESS-1 resolution 1920x1080
 
-exec zed --foreground /workspace
+# sway's exec runs through a real shell (verified), so this does normal
+# parameter expansion: ZED_WORKSPACE_DIR overrides where Zed opens,
+# defaulting to /workspace (Docker Compose's own bind mount) if unset. Lets
+# a deployment put the workspace dir inside a single /home/zed volume
+# instead (e.g. Kubernetes, to avoid a second PVC/subPath - see
+# k8s/deployment.yaml) without needing a different image or config file.
+exec sh -c 'exec zed --foreground "${ZED_WORKSPACE_DIR:-/workspace}"'

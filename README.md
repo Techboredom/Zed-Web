@@ -285,6 +285,18 @@ equivalent launch arg (e.g. Puppeteer's `args: ['--no-sandbox']`).
   volume is created; edit it normally through Zed after that, same as any
   other setting — this only sets the starting point, not a permanent
   override.
+- Prefer one volume for the *whole* of `/home/zed` instead (matching
+  `k8s/deployment.yaml`'s approach), so `rustup`/`uv`/the npm-global tool
+  installs persist too, not just Zed's own settings/extensions? See the
+  commented alternative in `docker-compose.yml`. Works with a named volume
+  (auto-populated from the image the first time it's created — same as
+  `zed-config`/`zed-data` above) or a bind mount to a real host folder
+  instead — that starts empty, but `entrypoint.sh` detects that and
+  restores `zed`/`rustup`/`uv`/npm-global tools from what's baked into the
+  image (the same mechanism Kubernetes' PVC needs and this doesn't
+  strictly; see the Kubernetes section below for why). Pair with
+  `ZED_WORKSPACE_DIR=/home/zed/workspace` if you'd rather project files
+  live inside that single volume too, instead of their own separate mount.
 
 ## Kubernetes
 
@@ -330,11 +342,17 @@ Verified end-to-end here: a fresh/empty volume mounted straight over
 afterward, and a second boot on that same (now-populated) volume correctly
 skips it.
 
-There's no separate PVC for `/workspace` either — it's the same `zed-home`
-PVC mounted a second time with `subPath: workspace`, so project files just
-live at the `workspace/` subdirectory of the one big volume instead of
-needing a volume of their own. Kubernetes creates that subdirectory on its
-own if it isn't already there, no extra setup needed.
+There's no separate PVC for `/workspace` either — `ZED_WORKSPACE_DIR` in the
+manifest points Zed at `/home/zed/workspace` (a directory inside the one
+`zed-home` volume) instead of the default top-level `/workspace` path, so
+project files live there without needing a volume of their own or a second
+mount of the same one. `sway-config`'s launch line and `entrypoint.sh` both
+read this var — it's what actually decides where Zed opens (defaulting to
+`/workspace`, Docker Compose's own bind mount, when unset), independent of
+however `/home/zed` itself happens to be mounted. Verified: with only the
+single `/home/zed` mount and `ZED_WORKSPACE_DIR` set, Zed correctly opens
+`/home/zed/workspace` and everything else works exactly as with the default
+path.
 
 Set `UPDATE_ON_START=true` (commented out in the manifest by default) to
 also re-fetch latest `zed`/`rustup`/`uv`/the npm-global tools on every pod

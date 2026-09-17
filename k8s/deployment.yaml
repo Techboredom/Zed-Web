@@ -20,9 +20,9 @@ spec:
   # own baked-in defaults (see the README's Kubernetes section, and the
   # comment above that reseed logic in entrypoint.sh, for why a PVC there
   # needs that at all when the compose deployment never did). No separate
-  # PVC for /workspace either - see its volumeMount below, it's a subPath
-  # into this same volume instead. Size accordingly: this now covers both
-  # the toolchain/home stuff *and* actual project files.
+  # PVC for /workspace either - ZED_WORKSPACE_DIR below points Zed at a
+  # directory inside this one instead. Size accordingly: this now covers
+  # both the toolchain/home stuff *and* actual project files.
   resources:
     requests:
       storage: 100Gi
@@ -94,6 +94,12 @@ spec:
             - name: VNC_PASSWORD
               valueFrom:
                 secretKeyRef: {name: zed-web-auth, key: VNC_PASSWORD}
+            # Points Zed at a directory inside the single zed-home volume
+            # instead of a separate /workspace mount - see sway-config and
+            # entrypoint.sh, which both read this (defaults to /workspace,
+            # Docker Compose's own bind mount, when unset).
+            - name: ZED_WORKSPACE_DIR
+              value: /home/zed/workspace
             # - name: UPDATE_ON_START     # opt-in; re-checks zed/rustup/uv/
             #   value: "true"             # npm-global tools on every pod
                                            # start. Off by default - needs
@@ -101,11 +107,6 @@ spec:
                                            # every restart. See entrypoint.sh.
           volumeMounts:
             - {name: home, mountPath: /home/zed}
-            # Same PVC, mounted a second time via subPath: /workspace ends
-            # up as the "workspace" subdirectory of zed-home rather than a
-            # volume of its own. Kubernetes creates that subdirectory
-            # automatically if it isn't already there.
-            - {name: home, mountPath: /workspace, subPath: workspace}
           # A starting point, not a measured requirement - adjust to taste.
           # Zed + sway + Chrome + whatever language servers/build tooling
           # get used can burst well above the request.

@@ -29,7 +29,25 @@ services:
       - ./workspace:/workspace                # your project files
       - zed-config:/home/zed/.config/zed       # editor settings
       - zed-data:/home/zed/.local/share/zed    # extensions, state
+      # Prefer one volume for the whole of /home/zed instead (matching
+      # k8s/deployment.yaml) - e.g. to get rustup/uv/npm-global tool
+      # installs persisted too, not just Zed's own settings/extensions?
+      # Replace the three lines above with:
+      #   - ./workspace:/workspace
+      #   - zed-home:/home/zed
+      # ...and add `zed-home:` under the `volumes:` section below. Works
+      # with either a named volume (auto-populated from the image the
+      # first time it's created, so nothing else to do) or a bind mount to
+      # a real host folder instead (`- /path/on/host:/home/zed` - starts
+      # empty; entrypoint.sh detects that and restores zed/rustup/uv/
+      # npm-global tools from what's baked into the image, same mechanism
+      # k8s's PVC needs and this doesn't strictly - see the README's
+      # Kubernetes section for why). Optionally also set
+      # ZED_WORKSPACE_DIR=/home/zed/workspace and drop the separate
+      # ./workspace bind mount, if you'd rather project files live inside
+      # that single volume too instead of their own mount.
 
 volumes:
   zed-config:
   zed-data:
+  # zed-home:   # only if you switched to the single-volume pattern above
