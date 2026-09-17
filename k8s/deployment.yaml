@@ -19,23 +19,15 @@ spec:
   # entrypoint.sh knows how to reseed a fresh/empty $HOME from the image's
   # own baked-in defaults (see the README's Kubernetes section, and the
   # comment above that reseed logic in entrypoint.sh, for why a PVC there
-  # needs that at all when the compose deployment never did).
+  # needs that at all when the compose deployment never did). No separate
+  # PVC for /workspace either - see its volumeMount below, it's a subPath
+  # into this same volume instead. Size accordingly: this now covers both
+  # the toolchain/home stuff *and* actual project files.
   resources:
     requests:
       storage: 100Gi
   # storageClassName: standard   # uncomment/adjust for your cluster if the
                                   # default storage class isn't what you want
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: zed-workspace
-spec:
-  accessModes: ["ReadWriteOnce"]
-  resources:
-    requests:
-      storage: 20Gi   # your project files; size to taste
-  # storageClassName: standard
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -109,7 +101,11 @@ spec:
                                            # every restart. See entrypoint.sh.
           volumeMounts:
             - {name: home, mountPath: /home/zed}
-            - {name: workspace, mountPath: /workspace}
+            # Same PVC, mounted a second time via subPath: /workspace ends
+            # up as the "workspace" subdirectory of zed-home rather than a
+            # volume of its own. Kubernetes creates that subdirectory
+            # automatically if it isn't already there.
+            - {name: home, mountPath: /workspace, subPath: workspace}
           # A starting point, not a measured requirement - adjust to taste.
           # Zed + sway + Chrome + whatever language servers/build tooling
           # get used can burst well above the request.
@@ -133,7 +129,6 @@ spec:
             periodSeconds: 20
       volumes:
         - {name: home, persistentVolumeClaim: {claimName: zed-home}}
-        - {name: workspace, persistentVolumeClaim: {claimName: zed-workspace}}
 ---
 apiVersion: v1
 kind: Service

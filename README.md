@@ -330,6 +330,12 @@ Verified end-to-end here: a fresh/empty volume mounted straight over
 afterward, and a second boot on that same (now-populated) volume correctly
 skips it.
 
+There's no separate PVC for `/workspace` either — it's the same `zed-home`
+PVC mounted a second time with `subPath: workspace`, so project files just
+live at the `workspace/` subdirectory of the one big volume instead of
+needing a volume of their own. Kubernetes creates that subdirectory on its
+own if it isn't already there, no extra setup needed.
+
 Set `UPDATE_ON_START=true` (commented out in the manifest by default) to
 also re-fetch latest `zed`/`rustup`/`uv`/the npm-global tools on every pod
 start, not just restore what was baked in — verified working end-to-end too
